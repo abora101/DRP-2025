@@ -1,5 +1,5 @@
 Usage:
-
+-
 
 Import "protein_network" from the sample_networks folder in this repo
 
@@ -31,9 +31,13 @@ network.visualize_results(results, phase_plot_proteins=["Protein 1", "Protein 2"
 
 
 Dependencies:
+- 
 networkx 3.4.2
+
 numpy 2.2.2
+
 scipy.integrate 1.15.1
+
 matplotlib 3.10.0
 
 (Older versions probably still work)
