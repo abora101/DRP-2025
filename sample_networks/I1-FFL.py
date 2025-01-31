@@ -10,7 +10,7 @@ network.add_protein("C", initial_level=0, removal_rate=0.5, beta_naught=1.5, agg
 
 # Add interactions
 network.add_interaction(source="A", target="B", n=10.0, K=1.0, interaction_type="activation")
-network.add_interaction(source="B", target="C", n=10.0, K=0.5, interaction_type="inhibition")
+network.add_interaction(source="B", target="C", n=10.0, K=1.4, interaction_type="inhibition")
 network.add_interaction(source="A", target="C", n=10.0, K=1.0, interaction_type="activation")
 
 # Set external signals
@@ -19,7 +19,7 @@ network.set_external_signal("B", lambda t: True)
 network.set_external_signal("C", lambda t: False) 
 
 # Simulate and visualize
-results = network.simulate(t_span=(0, 20), max_step = 0.01)
+results = network.simulate(t_span=(0, 40), max_step = 0.01)
 network.visualize_results(results, phase_plot_proteins=["B", "C"])
 
 

@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 from scipy.integrate import solve_ivp
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from matplotlib.patches import FancyArrowPatch
@@ -14,136 +14,21 @@ class HillInteraction:
     type: str  # 'activation' or 'repression'
 
 class ProteinNetwork:
-    def __init__(self, name, noise_level: float = 0.0):
-        """Initialize an empty protein regulatory network"""
-        self.name = name
-        self.graph = nx.DiGraph()
-        self.protein_levels = {}
-        self.interactions = {}
-        self.removal_rates = {}  # alpha values for each protein
-        self.aggregation_types = {}  # 'AND' or 'OR' for each protein
-        self.beta_naughts = {}  # Production rates for each protein
-        self.external_signals = {}  # External signals for each protein
-        self.noise_level = noise_level #noise amt is random normal * noise_level
+    # [Previous __init__ and other methods remain the same until visualize_results]
 
-    def get_noise_sample(self):
-        return self.noise_level * np.random.normal(0, 1)
-        
-    def add_protein(self, name: str, initial_level: float = 1.0, removal_rate: float = 1.0, beta_naught: float = 1.0, aggregation_type: str = 'AND'):
-        """Add a protein to the network"""
-        if aggregation_type not in ['AND', 'OR']:
-            raise ValueError(f"aggregation_type for protein {name} must be either 'AND' or 'OR'")
-            
-        self.graph.add_node(name)
-        self.protein_levels[name] = initial_level
-        self.removal_rates[name] = removal_rate
-        self.beta_naughts[name] = beta_naught
-        self.aggregation_types[name] = aggregation_type
-        self.external_signals[name] = lambda t: True  # Default: always ON
-    
-    def add_interaction(self, source: str, target: str, n: float, K: float, interaction_type: str = 'activation'):
-        """Add a directed interaction between proteins using Hill function regulation"""
-        if not (source in self.graph and target in self.graph):
-            raise ValueError("Both proteins must be added to network first")
-            
-        if self.graph.has_edge(source, target):
-            raise ValueError(f"Interaction from {source} to {target} already exists")
-            
-        self.graph.add_edge(source, target)
-        self.interactions[(source, target)] = HillInteraction(
-            n=n,
-            K=K,
-            type=interaction_type
-        )
-    
-    def set_external_signal(self, protein: str, signal_function):
-        """Set the external signal function for a protein"""
-        if protein not in self.graph:
-            raise ValueError(f"Protein {protein} not in network")
-        self.external_signals[protein] = signal_function
-    
-    def calculate_hill_regulation(self, source: str, source_level: float, interaction: HillInteraction, t: float) -> float:
-        """Calculate regulatory effect using Hill function and external signal"""
-        if not self.external_signals[source](t):
-            hill_term = 0
-        else:
-            hill_term = (source_level ** interaction.n) / \
-                   (interaction.K ** interaction.n + source_level ** interaction.n)
-        
-        if interaction.type == 'activation':
-            return hill_term
-        else:  # repression
-            return 1 - hill_term
-    
-    def get_production_rate(self, protein: str, current_levels: Dict[str, float], t: float) -> float:
-        """Calculate the total production rate (beta) for a protein"""
-        predecessors = list(self.graph.predecessors(protein))
-        
-        if not predecessors:
-            return self.beta_naughts[protein]  # baseline rate
-        
-        # Calculate individual regulatory effects
-        regulations = []
-        for source in predecessors:
-            interaction = self.interactions[(source, protein)]
-            source_level = current_levels[source]
-            hill_term = self.calculate_hill_regulation(source, source_level, interaction, t)
-            regulations.append(hill_term)
-            
-        # Combine effects based on aggregation type
-        if self.aggregation_types[protein] == 'AND':
-            # Product of all terms
-            combined_effect = np.prod(regulations)
-        else:  # 'OR'
-            # In high n limit, this approaches logical OR
-            combined_effect = max(regulations)
-            
-        return self.beta_naughts[protein] * combined_effect
-    
-    def system_equations(self, t: float, y: np.ndarray, protein_order: List[str], max_step: float = np.inf) -> np.ndarray:
-        """Define the system of differential equations"""
-        current_levels = {protein: level for protein, level in zip(protein_order, y)}
-        derivatives = np.zeros_like(y)
-        
-        for i, protein in enumerate(protein_order):
-            beta = self.get_production_rate(protein, current_levels, t)
-            alpha = self.removal_rates[protein]
-            derivatives[i] = beta - alpha * y[i] + self.get_noise_sample()
-
-            max_derivative = -y[i]/max_step
-            derivatives[i] = max(derivatives[i], max_derivative)
-            
-        return derivatives
-    
-    def simulate(self, t_span: Tuple[float, float], method: str = 'RK45', rtol: float = 1e-3, atol: float = 1e-6, max_step: float = np.inf) -> Dict[str, np.ndarray]:
-        """Simulate the system using scipy.integrate.solve_ivp"""
-        protein_order = list(self.graph.nodes)
-        y0 = [self.protein_levels[protein] for protein in protein_order]
-        
-        solution = solve_ivp(
-            fun=lambda t, y: self.system_equations(t, y, protein_order, max_step),
-            t_span=t_span,
-            y0=y0,
-            method=method,
-            rtol=rtol,
-            atol=atol,
-            max_step=max_step
-        )
-        
-        results = {}
-        for i, protein in enumerate(protein_order):
-            results[protein] = solution.y[i]
-            
-        results['t'] = solution.t
-        return results
-
-    def visualize_results(self, simulation_results: Dict[str, np.ndarray], phase_plot_proteins: List[str] = None):
+    def visualize_results(self, 
+                         simulation_results: Dict[str, np.ndarray], 
+                         phase_plot_proteins: List[str] = None, 
+                         use_tight_axes: bool = True,
+                         time_points: Optional[List[float]] = None):
         """
-        Create network and time series visualizations with optional phase plot
+        Create network and time series visualizations with optional phase plot and time point markers
         
         Parameters:
         - simulation_results: Simulation results dictionary
         - phase_plot_proteins: Optional list of two proteins for phase plot
+        - use_tight_axes: If True, adjusts phase plot axes to focus on the trajectory range
+        - time_points: Optional list of time points to highlight in the visualizations
         """
         # Determine subplot layout based on phase plot
         if phase_plot_proteins:
@@ -156,7 +41,7 @@ class ProteinNetwork:
         # Network subplot
         ax1 = plt.subplot(subplot_layout[0], subplot_layout[1], 1)
         
-        # Existing network visualization code...
+        # [Network visualization code remains the same...]
         pos = nx.spring_layout(self.graph, k=1.5, iterations=50)
         
         nx.draw_networkx_nodes(self.graph, pos, 
@@ -198,44 +83,69 @@ class ProteinNetwork:
                 fontsize=8,
                 bbox=dict(facecolor='white', edgecolor='gray', alpha=0.7, boxstyle='round,pad=0.3'))
         
-        ax1.set_title(f"{self.name} Protein Regulatory Network", fontsize=16, fontweight='bold', pad=10)
+        ax1.set_title(f"{self.name} Regulatory Network", fontsize=16, fontweight='bold', pad=10)
         ax1.axis('off')
         
         ax1.set_xlim(min(pos[node][0] for node in pos) - 0.3, max(pos[node][0] for node in pos) + 0.3)
         ax1.set_ylim(min(pos[node][1] for node in pos) - 0.3, max(pos[node][1] for node in pos) + 0.3)
         
-        # Time series subplot
+        # Time series subplot with time point markers
         ax2 = plt.subplot(subplot_layout[0], subplot_layout[1], 2)
         t = simulation_results['t']
         
+        # Plot time series
         for protein in self.graph.nodes:
-            ax2.plot(t, simulation_results[protein], 
-                label=f'{protein} ({self.aggregation_types[protein]})',
-                linewidth=2)
+            line = ax2.plot(t, simulation_results[protein], 
+                          label=f'{protein}',
+                          linewidth=2)
+            
+            # Add markers for specific time points
+            if time_points:
+                color = line[0].get_color()  # Get the color of the current line
+                for time_point in time_points:
+                    # Find the closest time index
+                    idx = np.abs(t - time_point).argmin()
+                    ax2.plot(t[idx], simulation_results[protein][idx], 'o', 
+                            color=color, markersize=8, 
+                            label=f'{protein} at t={time_point}')
         
         ax2.set_xlabel('Time', fontsize=12)
         ax2.set_ylabel('Concentration', fontsize=12)
         ax2.set_title('Protein Concentrations Over Time', fontsize=16, fontweight='bold', pad=10)
         ax2.grid(True, alpha=0.3)
+        
+        # Add vertical lines for time points
+        if time_points:
+            for time_point in time_points:
+                ax2.axvline(x=time_point, color='gray', linestyle='--', alpha=0.5)
+        
         ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         
-        # Optional Phase Plot
+        # Optional Phase Plot with time point markers
         if phase_plot_proteins and len(phase_plot_proteins) == 2:
             ax3 = plt.subplot(subplot_layout[0], subplot_layout[1], 3)
             
             protein_x, protein_y = phase_plot_proteins
-            t = simulation_results['t']
             x_traj = simulation_results[protein_x]
             y_traj = simulation_results[protein_y]
             
             # Prepare initial conditions for other proteins
             fixed_levels = {p: simulation_results[p][0] for p in self.graph.nodes if p not in phase_plot_proteins}
             
-            # Create vector field
-            x_range = np.linspace(0, max(x_traj)*1.2, 20)
-            y_range = np.linspace(0, max(y_traj)*1.2, 20)
-            X, Y = np.meshgrid(x_range, y_range)
+            # Determine axis limits based on trajectory
+            if use_tight_axes:
+                x_min, x_max = min(x_traj), max(x_traj)
+                y_min, y_max = min(y_traj), max(y_traj)
+                x_padding = (x_max - x_min) * 0.1
+                y_padding = (y_max - y_min) * 0.1
+                x_range = np.linspace(x_min - x_padding, x_max + x_padding, 20)
+                y_range = np.linspace(y_min - y_padding, y_max + y_padding, 20)
+            else:
+                x_range = np.linspace(0, max(x_traj)*1.2, 20)
+                y_range = np.linspace(0, max(y_traj)*1.2, 20)
             
+            # Vector field calculation
+            X, Y = np.meshgrid(x_range, y_range)
             U = np.zeros_like(X)
             V = np.zeros_like(Y)
             
@@ -259,11 +169,22 @@ class ProteinNetwork:
             ax3.plot(x_traj[0], y_traj[0], 'ro', label='Initial Point')
             ax3.plot(x_traj[-1], y_traj[-1], 'go', label='Final Point')
             
+            # Add markers for specific time points in phase plot
+            if time_points:
+                for time_point in time_points:
+                    idx = np.abs(t - time_point).argmin()
+                    ax3.plot(x_traj[idx], y_traj[idx], 'mo', markersize=8,
+                            label=f't={time_point}')
+            
             ax3.set_xlabel(f'{protein_x} Concentration', fontsize=12)
             ax3.set_ylabel(f'{protein_y} Concentration', fontsize=12)
             ax3.set_title(f'Phase Portrait: {protein_x} vs {protein_y}', fontsize=16)
             ax3.grid(True, alpha=0.3)
             ax3.legend()
+            
+            if use_tight_axes:
+                ax3.set_xlim(x_min - x_padding, x_max + x_padding)
+                ax3.set_ylim(y_min - y_padding, y_max + y_padding)
         
         plt.tight_layout()
         plt.show()

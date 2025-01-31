@@ -1,7 +1,7 @@
 import protein_network as pn
 
 # Example usage:
-network = pn.ProteinNetwork("Human Pain Sensation", 5.0)
+network = pn.ProteinNetwork("Human Pain Sensation", 0)
 
 # Add proteins
 network.add_protein("X1", initial_level=0, removal_rate=0.5, beta_naught=1.5)
