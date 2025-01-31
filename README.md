@@ -25,8 +25,11 @@ results = network.simulate(t_span=(0, 4), max_step = 0.01)
 - uses scipy's solve_ivp to simulate the coupled SDE.
 - results, t_span, and max_step are akin to outputs/inputs from solve_ivp
 
-network.visualize_results(results, phase_plot_proteins=["Protein 1", "Protein 2"])
+network.visualize_results(results, phase_plot_proteins=["Protein 1", "Protein 2"], time_points=[], display_until: float, show_network = True)
 - phase_plot_proteins must be exactly two proteins long if used. if set to None, no phase plot is displayed.
+- A point on the phase plot is plotted and a black dotted line is drawn for every timestamp in time_points < display_until
+- The time series and phase plot are greyed out after display_until, for use in presentations
+- show_network controls whether or not you want to display the actual network itself
 - displays the protein network as a directed graph and the time series of the proteins
 
 
