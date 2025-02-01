@@ -1,3 +1,7 @@
+Read the book "An Introduction to Systems Biology", second edition, by Uri Alon.
+
+Gave a talk at the DRP Symposium; slides are in this repo. Slides made extensive use of diagrams generated using this code.
+
 Usage:
 -
 
